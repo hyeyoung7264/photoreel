@@ -1,9 +1,10 @@
 """공개 라이선스 테스트 사진 세트를 내려받는다 (Wikimedia Commons).
 
 사용자 본인의 사진이 아니다. 파이프라인을 실제 사진으로 돌려 보기 위한 대체 세트이며,
-저작자·라이선스는 samples/jeju/CREDITS.md 에 기록된다. 사진 파일은 저장소에 커밋하지 않는다.
+저작자·라이선스는 samples/<세트>/CREDITS.md 에 기록된다. 사진 파일은 저장소에 커밋하지 않는다.
 
-    uv run python scripts/fetch_sample_photos.py
+    uv run python scripts/fetch_sample_photos.py          # 전부
+    uv run python scripts/fetch_sample_photos.py pets     # 한 세트만
 """
 
 from __future__ import annotations
@@ -18,11 +19,13 @@ from pathlib import Path
 
 UA = {"User-Agent": "photoreel-prototype/0.1 (local prototype test set download)"}
 API = "https://commons.wikimedia.org/w/api.php"
-OUT = Path(__file__).resolve().parent.parent / "samples" / "jeju"
+SAMPLES = Path(__file__).resolve().parent.parent / "samples"
 
 # 파일명 앞 번호는 일부러 내용과 무관하게 섞었다. 업로드(파일명) 순서가 곧 좋은 순서가
 # 되지 않도록 해서, 구성안이 순서를 실제로 다시 짜는지 확인하기 위함이다.
-PHOTOS = [
+SETS = {
+    # 여행: 첫 구현·평가용 세트
+    "jeju": [
     ("IMG_2041", "File:Jeju dongmun market 4.JPG"),
     ("IMG_2107", "File:Jeju Island sunset1.jpg"),
     ("IMG_2113", "File:Seongsan Ilchulbong 03.jpg"),
@@ -35,7 +38,19 @@ PHOTOS = [
     ("IMG_2377", "File:Jeju Dongmun Traditional Market 01.jpg"),
     ("IMG_2410", "File:Seongsan-ri town at blue hour seen from Seongsan Ilchulbong volcano Jeju Island South Korea.jpg"),
     ("IMG_2466", "File:Jeju Olle Route 14.jpg"),
-]
+],
+    # 여행이 아닌 용도 확인용 (서로 다른 개들의 사진이다. 한 마리의 하루가 아니다.)
+    "pets": [
+        ("P_0114", "File:Beagle sleeping on the sofa.jpg"),
+        ("P_0131", "File:Running dog at the beach.jpg"),
+        ("P_0152", "File:“German Shepard Dog running on the beaches of the Gulf of Mexico - July 2019.jpg”.jpg"),
+        ("P_0178", "File:Dog Walking in Cache Valley (51202415647).jpg"),
+        ("P_0203", "File:Beagle puppy sleeping 2.jpg"),
+        ("P_0219", "File:A bulldog at Rosie's Dog Beach.jpg"),
+        ("P_0244", "File:French Bulldog visits the Oasis of Mara Trail (40371643270).jpg"),
+        ("P_0260", "File:Jack Russell Terrier Eddi running at the beach.JPG"),
+    ],
+}
 
 
 def fetch(url: str, timeout: int = 120) -> bytes:
@@ -61,7 +76,9 @@ def strip_html(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", s or "")).strip()
 
 
-def main() -> int:
+def fetch_set(name: str) -> int:
+    OUT = SAMPLES / name
+    PHOTOS = SETS[name]
     OUT.mkdir(parents=True, exist_ok=True)
     credits = [
         "# 테스트 사진 출처",
@@ -108,6 +125,11 @@ def main() -> int:
     (OUT / "CREDITS.md").write_text("\n".join(credits) + "\n", encoding="utf-8")
     print(f"\n{len(PHOTOS) - failed}/{len(PHOTOS)}장 저장: {OUT}")
     return 1 if failed else 0
+
+
+def main() -> int:
+    names = sys.argv[1:] or list(SETS)
+    return max(fetch_set(n) for n in names)
 
 
 if __name__ == "__main__":

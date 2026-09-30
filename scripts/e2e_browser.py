@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -65,6 +66,25 @@ def main() -> int:
              scenes=page.locator("#scenes .scene").count(), total=page.inner_text("#plan-total"))
         page.screenshot(path=str(out / "3_edited.png"), full_page=True)
 
+        # 생성 방식 고르기: 사용 가능한 엔진만 선택되고, 연결 안 된 엔진은 눌러도 바뀌지 않아야 한다.
+        pid = page.evaluate("location.hash.slice(1)")
+
+        def saved_engine() -> str:
+            page.wait_for_function("document.getElementById('save-state').textContent === '저장됨'")
+            return page.evaluate(f"fetch('/api/projects/{pid}').then(r => r.json()).then(j => j.plan.engine)")
+
+        def engine_card(name: str):
+            return page.locator(".engine b").filter(has_text=re.compile("^" + re.escape(name)))
+
+        engine_card("입체감 있는 움직임").click()
+        picked = saved_engine()
+        engine_card("사진에 움직임 생성").click()
+        still = page.evaluate(f"fetch('/api/projects/{pid}').then(r => r.json()).then(j => j.plan.engine)")
+        engine_card("원본 사진 편집").click()
+        back = saved_engine()
+        step("engine", picked=picked, after_click_unavailable=still, back=back)
+        ok_engine = (picked, still, back) == ("parallax", "parallax", "edit")
+
         t0 = time.time()
         page.click("#btn-render")
         page.wait_for_selector("#result video", timeout=600_000)
@@ -94,6 +114,7 @@ def main() -> int:
 
     ok = (
         ok_edit
+        and ok_engine
         and played["duration"] > 5
         and played["played"] > 1
         and target.stat().st_size > 100_000

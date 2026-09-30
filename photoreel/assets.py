@@ -39,6 +39,12 @@ ASSETS = {
         1_000_000,
         "제목 글꼴 (Noto Sans KR, OFL)",
     ),
+    "depth": Asset(
+        "depth-anything-v2-small.onnx",
+        "https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx",
+        50_000_000,
+        "깊이 추정 (Depth Anything V2 Small, Apache-2.0) — '입체감 있는 움직임' 엔진에서만 사용",
+    ),
     "clip_vision": Asset(
         "clip-vit-base-patch32-vision.onnx",
         "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx",

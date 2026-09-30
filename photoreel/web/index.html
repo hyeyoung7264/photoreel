@@ -78,7 +78,8 @@ table.kv td { padding: 3px 14px 3px 0; vertical-align: top; }
 table.kv td:first-child { color: var(--muted); white-space: nowrap; }
 .engines { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .engine { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font-size: 13px; }
-.engine.on { border-color: var(--accent); }
+.engine.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.engine.pick { cursor: pointer; }
 .engine b { display: block; margin-bottom: 2px; font-size: 14px; }
 .tag { display: inline-block; font-size: 11.5px; padding: 0 7px; border-radius: 10px; background: var(--soft); margin-left: 6px; }
 #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--danger); color: #fff;
@@ -288,7 +289,10 @@ async function savePlan() {
   catch (e) { toast(e.message); $("save-state").textContent = "저장 실패"; }
   renderPlan();
 }
-$("style").addEventListener("change", () => makePlan({ style: $("style").value, keep_current_order: true }));
+$("style").addEventListener("change", () => makePlan({
+  style: $("style").value, keep_current_order: true, music: state.plan.music.mode !== "none",
+  aspect: state.plan.output.aspect, title: state.plan.title,
+}));
 $("grade").addEventListener("change", () => { state.plan.grade = $("grade").value; scheduleSave(); });
 $("mood").addEventListener("change", () => {
   const v = $("mood").value;
@@ -307,11 +311,13 @@ function move(i, d) {
   const inc = state.plan.scenes.filter((s) => s.included), j = i + d;
   if (j < 0 || j >= inc.length) return;
   [inc[i], inc[j]] = [inc[j], inc[i]];
+  inc[j].reason = "직접 옮긴 자리";
   reorder(inc);
 }
 function moveTo(from, to) {
   const inc = state.plan.scenes.filter((s) => s.included);
   const [s] = inc.splice(from, 1); inc.splice(to, 0, s);
+  s.reason = "직접 옮긴 자리";
   reorder(inc);
 }
 function setIncluded(id, on) {
@@ -319,7 +325,7 @@ function setIncluded(id, on) {
   const inc = state.plan.scenes.filter((x) => x.included && x !== s);
   const exc = state.plan.scenes.filter((x) => !x.included && x !== s);
   s.included = on;
-  if (on) s.transition = state.meta.styles.find((x) => x.id === state.plan.style).transition;
+  if (on) { s.transition = state.meta.styles.find((x) => x.id === state.plan.style).transition; s.reason = "직접 다시 넣음"; }
   else s.exclude_reason = "직접 제외함";
   state.plan.scenes = on ? [...inc, s, ...exc] : [...inc, ...exc, s];
   renderPlan(); scheduleSave();
@@ -346,8 +352,11 @@ function renderPlan() {
   notes.push(el("div", { class: "box info" }, el("b", {}, "순서를 정한 기준"), el("div", {}, plan.order_basis), plan.notes.length ? el("ul", {}, plan.notes.map((n) => el("li", {}, n))) : null));
   $("plan-notes").replaceChildren(...notes);
 
-  $("engines").replaceChildren(...m.engines.map((e) => el("div", { class: "engine" + (e.id === plan.engine ? " on" : "") },
-    el("b", {}, e.name, el("span", { class: "tag" }, e.id === plan.engine ? "이번에 사용" : e.available ? "사용 가능" : "아직 연결 안 됨")),
+  $("engines").replaceChildren(...m.engines.map((e) => el("div", {
+      class: "engine" + (e.id === plan.engine ? " on" : "") + (e.available ? " pick" : ""),
+      onclick: () => { if (e.available && e.id !== plan.engine) { plan.engine = e.id; renderPlan(); scheduleSave(); } } },
+    el("b", {}, e.name, el("span", { class: "tag" }, e.id === plan.engine ? "선택됨" : e.available ? "눌러서 선택" : "아직 연결 안 됨")),
+    el("div", { class: "muted" }, e.uses_generative_model ? "생성 모델 사용" : e.ai_models ? `생성 모델 미사용 · ${e.ai_models}` : "생성 모델 미사용 · AI 모델 없이 편집만"),
     e.disclosure, e.available ? null : el("div", { class: "muted", style: "margin-top:4px" }, e.requirement))));
 
   let dragFrom = null;
@@ -419,7 +428,8 @@ function renderResult() {
     out.push(
       el("video", { src: base, controls: true, playsinline: true, preload: "metadata" }),
       el("div", { class: "row", style: "justify-content:center" }, el("a", { href: base + "?download=1" }, el("button", { class: "primary" }, "MP4 내려받기"))),
-      el("div", { class: "box info" }, el("b", {}, "이 영상이 만들어진 방식"), el("div", {}, r.engine.disclosure),
+      el("div", { class: "box info" }, el("b", {}, `이 영상이 만들어진 방식: ${r.engine.name}`), el("div", {}, r.engine.disclosure),
+        r.engine.ai_models ? el("div", {}, `사용한 AI 모델: ${r.engine.ai_models}`) : null,
         el("div", {}, r.audio ? `음악: ${r.audio.source}, ${r.audio.bpm}BPM` : "음악: 없음 (무음)")),
       el("table", { class: "kv" },
         el("tr", {}, el("td", {}, "영상"), el("td", {}, `${r.width}×${r.height} · ${r.fps}fps · ${fmt(r.duration)} · ${r.scenes}장면 · ${(r.bytes / 1e6).toFixed(1)}MB`)),

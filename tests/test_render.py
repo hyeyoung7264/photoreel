@@ -2,8 +2,9 @@ import subprocess
 import wave
 
 import numpy as np
+import pytest
 
-from photoreel import music, planner, render
+from photoreel import depth, music, planner, render
 from photoreel.config import ffmpeg_exe
 from photoreel.engines import ENGINES, ClipContext, EngineUnavailable, VideoFileClip
 from photoreel.models import Output
@@ -107,3 +108,13 @@ def test_video_file_clip_lets_an_external_clip_replace_a_scene(project_with_phot
     clip = VideoFileClip(out, 240, 426, 12, 1.0)
     assert clip.frame(0.0).shape == (426, 240, 3) and clip.frame(1.0).shape == (426, 240, 3)
     assert len(clip.frames) == 12
+
+
+@pytest.mark.skipif(not depth.available(), reason="깊이 추정 모델 파일이 없음 (서버를 한 번 켜면 받아짐)")
+def test_parallax_engine_renders_and_reports_the_model_it_used(project_with_photos, tmp_path):
+    board = small_board(project_with_photos, "음악 없이")
+    board.engine = "parallax"
+    out, stats = do_render(project_with_photos, board, tmp_path)
+    assert out.read_bytes()[4:8] == b"ftyp"
+    assert stats["engine"]["id"] == "parallax"
+    assert stats["engine"]["uses_generative_model"] is False and "Depth Anything" in stats["engine"]["ai_models"]

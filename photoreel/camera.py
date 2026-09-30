@@ -87,7 +87,7 @@ def choose_framing(w: int, h: int, aspect: float, sal, faces: list[dict]) -> tup
         return "cover", "잘리는 부분이 적어 가득 채움"
     if visible < 0.3:
         return "fit-blur", "가로로 매우 긴 사진이라 넓게 보임"
-    return "cover", "가로 사진을 가득 채우고 옆으로 훑음"
+    return "cover", "화면을 가득 채우고 잘리는 방향으로 훑음"
 
 
 def plan_path(

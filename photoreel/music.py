@@ -206,7 +206,7 @@ def _build(mood: str, seconds: float, bpm: int, seed: int) -> np.ndarray:
 
     out = tr.mix()
     if mood == "lofi":  # 은은한 바닥 잡음
-        out += (rng.standard_normal(out.shape) * 0.0025)
+        out += rng.standard_normal(out.shape) * 0.0012
     return out
 
 
@@ -235,6 +235,6 @@ def synthesize(path: Path, seconds: float, mood: str, bpm: int, seed: int = 7) -
         "bpm": bpm,
         "mood": mood,
         "peak": round(float(np.abs(audio).max()), 3),
-        "rms_db": round(20 * np.log10(float(np.sqrt((audio**2).mean())) + 1e-9), 1),
+        "rms_db": round(float(20 * np.log10(float(np.sqrt((audio**2).mean())) + 1e-9)), 1),
         "source": "앱 내장 합성 (외부 음원 미사용)",
     }

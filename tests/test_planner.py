@@ -102,11 +102,12 @@ def test_scene_starts_fall_on_beats():
 def test_keep_preserves_user_order_and_exclusions_when_style_changes():
     photos = [photo(f"p{i}") for i in range(5)]
     e = embs(photos)
-    keep = [("p3", True), ("p0", True), ("p4", False), ("p1", True), ("p2", True)]
+    keep = [("p3", True), ("p0", True), ("p4", False), ("p1", True), ("p2", False, "p0.jpg와(과) 거의 같은 사진")]
     board = planner.build(photos, e, "잔잔하게", style_id="cinematic", keep=keep)
     assert board.style == "cinematic" and board.order_mode == "manual"
-    assert order(board) == ["p3", "p0", "p1", "p2"]
-    assert [s.photo_id for s in board.scenes if not s.included] == ["p4"]
+    assert order(board) == ["p3", "p0", "p1"]
+    excluded = {s.photo_id: s.exclude_reason for s in board.scenes if not s.included}
+    assert excluded == {"p4": "직접 제외함", "p2": "p0.jpg와(과) 거의 같은 사진"}  # 자동 제외 이유가 사라지지 않음
 
 
 def test_no_music_and_unsupported_requests_surface_in_plan():
@@ -121,3 +122,21 @@ def test_faces_are_never_cropped_by_default_framing():
     photos = [photo("group", scene="people", faces=faces), photo("b"), photo("c")]
     board = planner.build(photos, embs(photos), "")
     assert next(s for s in board.scenes if s.photo_id == "group").framing == "fit-blur"
+
+
+def test_slower_pace_request_actually_lengthens_scenes():
+    photos = [photo(f"p{i}") for i in range(11)]
+    e = embs(photos)
+    normal = planner.build(photos, e, "필름 같은 추억")
+    slow = planner.build(photos, e, "필름 같은 추억, 천천히")
+    assert slow.included()[1].duration > normal.included()[1].duration
+    assert len(slow.included()) == len(normal.included())
+
+
+def test_chapter_transitions_are_not_back_to_back():
+    photos = [photo(f"p{i}", scene=sc) for i, sc in enumerate(
+        ["aerial", "sea", "nature", "market", "food", "person", "street", "sign", "plant"])]
+    board = planner.build(photos, embs(photos), "영화 같은 분위기")
+    kinds = [s.transition for s in board.included()]
+    assert "fade-black" in kinds
+    assert all(not (a == b == "fade-black") for a, b in zip(kinds, kinds[1:]))

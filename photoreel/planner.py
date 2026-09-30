@@ -17,7 +17,8 @@ from .styles import GRADES, STYLES, Style
 # 내용 종류를 크게 묶은 것. 촬영 시각이 없을 때 장면 묶음(챕터)의 기준이 된다.
 GROUPS = [
     ("scenery", "풍경", {"aerial", "nature", "sea", "road", "plant"}),
-    ("people", "인물", {"person", "people", "animal"}),
+    ("people", "인물", {"person", "people"}),
+    ("animal", "동물", {"animal"}),
     ("town", "거리·장소", {"street", "market", "sign", "vehicle", "indoor", "object"}),
     ("food", "음식", {"food"}),
     ("evening", "해질녘·밤", {"sunset", "night"}),
@@ -33,7 +34,7 @@ def _group(photo: dict) -> str:
     scene, light = tags.get("scene"), tags.get("light")
     if light in ("dusk", "night") and (scene in OUTDOOR or scene is None):
         return "evening"
-    if photo.get("face_area", 0) >= 0.01 and scene not in ("food",):
+    if photo.get("face_area", 0) >= 0.01 and scene not in ("food", "animal"):
         return "people"
     for key, _, members in GROUPS:
         if scene in members:
@@ -131,10 +132,10 @@ def _order_by_content(photos: list[dict], embs) -> tuple[list[str], dict[str, in
             if key == "evening":
                 reason[i] = f"{semantic.LIGHT_NAMES.get(by_id[i]['tags'].get('light'), '어두운')} 빛의 사진이라 끝부분에 배치"
             else:
-                reason[i] = f"‘{GROUP_NAME[key]}’ 사진끼리 묶음 ({_scene_name(by_id[i])}(으)로 분류)"
+                reason[i] = f"‘{GROUP_NAME[key]}’ 묶음 · {_scene_name(by_id[i])} 사진으로 분류"
         order += chained
         chapter_no += 1
-    reason[opener] = f"{_scene_name(by_id[opener])}: 넓게 보이는 장면이라 시작에 배치"
+    reason[opener] = f"{_scene_name(by_id[opener])} 사진으로 분류 · 넓게 보이는 장면이라 시작에 배치"
     return order, chapter, reason
 
 
@@ -166,7 +167,8 @@ def _order_by_time(photos: list[dict]) -> tuple[list[str], dict[str, int], dict[
 def _fit_beats(n: int, style: Style, pace: float, target: float | None, extra_beats: int) -> tuple[int, int, str]:
     """장면당 박자 수와 담을 수 있는 장면 수. (beats, max_scenes, 설명)"""
     beat = style.beat_sec
-    lo, hi = (target * 0.92, target * 1.08) if target else AUTO_DURATION
+    # 길이를 정하지 않았으면 기본 범위를 쓰되, 더 느리게·빠르게를 요청했다면 그만큼 범위도 옮긴다.
+    lo, hi = (target * 0.92, target * 1.08) if target else (AUTO_DURATION[0] * pace, AUTO_DURATION[1] * pace)
     beats = int(np.clip(round(style.beats * pace), style.min_beats, style.max_beats))
 
     def total(b: int, count: int) -> float:
@@ -237,9 +239,12 @@ def build(
     target_duration: float | None = None,
     music: bool = True,
     style_id: str | None = None,
-    keep: list[tuple[str, bool]] | None = None,
+    keep: list[tuple] | None = None,
 ) -> Storyboard:
-    """구성안을 만든다. keep 을 주면 그 순서·제외 상태를 유지하고 스타일 관련 값만 다시 정한다."""
+    """구성안을 만든다. keep 을 주면 그 순서·제외 상태를 유지하고 스타일 관련 값만 다시 정한다.
+
+    keep 항목: (photo_id, included) 또는 (photo_id, included, 제외 이유)
+    """
     if not photos:
         raise ValueError("사진이 없습니다.")
     reading = concept_mod.interpret(concept)
@@ -262,9 +267,9 @@ def build(
     excluded: dict[str, str] = {}
 
     if keep is not None:
-        known = [(pid, inc) for pid, inc in keep if pid in by_id]
-        order = [pid for pid, inc in known if inc]
-        excluded = {pid: "직접 제외함" for pid, inc in known if not inc}
+        known = [(k[0], k[1], k[2] if len(k) > 2 else "") for k in keep if k[0] in by_id]
+        order = [pid for pid, inc, _ in known if inc]
+        excluded = {pid: why or "직접 제외함" for pid, inc, why in known if not inc}
         for p in photos:  # 구성안을 만든 뒤에 추가된 사진
             if p["id"] not in order and p["id"] not in excluded:
                 order.append(p["id"])
@@ -310,6 +315,7 @@ def build(
     scenes: list[Scene] = []
     state: dict = {}
     count = len(order)
+    since_accent = 0  # 묶음이 바뀔 때의 강조 전환이 너무 잦지 않게 한다
     for idx, pid in enumerate(order):
         p = by_id[pid]
         framing, framing_reason = camera.choose_framing(p["width"], p["height"], ratio, p["saliency"], p["faces"])
@@ -325,10 +331,12 @@ def build(
             p["width"], p["height"], ratio, motion, framing, n_beats * style.beat_sec,
             style.zoom_rate, style.pan_rate, tuple(p["focus"]), p["saliency"], p["faces"],
         )
+        since_accent += 1
         if idx == 0:
             transition = "cut"
-        elif chapter.get(pid, 0) != chapter.get(order[idx - 1], 0):
+        elif chapter.get(pid, 0) != chapter.get(order[idx - 1], 0) and since_accent >= 3:
             transition = style.chapter_transition
+            since_accent = 0
         else:
             transition = style.transition
         text = reason.get(pid, "")

@@ -178,11 +178,13 @@ def make_plan(pid: str, req: PlanRequest) -> dict:
     keep = None
     current = p.plan()
     if req.keep_current_order and current:
-        keep = [(s.photo_id, s.included) for s in current.scenes]
+        keep = [(s.photo_id, s.included, s.exclude_reason) for s in current.scenes]
     board = planner.build(
         photos, p.embeddings(), req.concept[:500], title=req.title[:60], aspect=req.aspect,
         target_duration=req.target_duration, music=req.music, style_id=req.style, keep=keep,
     )
+    if keep is not None and ENGINES.get(current.engine) and ENGINES[current.engine].available:
+        board.engine = current.engine  # 스타일만 바꿀 때는 고른 생성 방식을 유지
     p.save_plan(board)
     return board.model_dump()
 

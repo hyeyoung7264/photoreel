@@ -255,6 +255,7 @@ def render(
                 image=apply_grade(img, board.grade), analysis=photos[s.photo_id], motion=s.motion,
                 framing=s.framing, seconds=it["span_end"] - it["span_start"], style=style,
                 out_w=w, out_h=h, fps=fps,
+                depth_cache=proxies[s.photo_id].parent.parent / "depth" / f"{s.photo_id}.npy",
             )
             clips[i] = engine.make_clip(ctx)
         for old in [k for k in clips if k < i - 1]:

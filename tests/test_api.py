@@ -88,3 +88,19 @@ def test_delete_photo_updates_plan(jpeg):
     assert victim not in [p["id"] for p in after["photos"]]
     assert victim not in [s["photo_id"] for s in after["plan"]["scenes"]]
     assert client.get(f"/api/projects/{pid}/photos/{victim}/thumb").status_code == 404
+
+
+def test_style_change_keeps_order_exclusions_and_engine(jpeg):
+    pid = client.post("/api/projects").json()["id"]
+    upload(pid, jpeg, 4)
+    plan = client.post(f"/api/projects/{pid}/plan", json={"concept": "잔잔하게"}).json()
+    plan["scenes"] = plan["scenes"][::-1]
+    plan["scenes"][0]["included"] = False
+    plan["engine"] = "edit"
+    saved = client.put(f"/api/projects/{pid}/plan", json=plan).json()
+    order = [s["photo_id"] for s in saved["scenes"]]
+    changed = client.post(f"/api/projects/{pid}/plan",
+                          json={"concept": "잔잔하게", "style": "upbeat", "keep_current_order": True}).json()
+    assert changed["style"] == "upbeat" and changed["engine"] == "edit"
+    assert [s["photo_id"] for s in changed["scenes"]] == order
+    assert [s["included"] for s in changed["scenes"]] == [True, True, True, False]

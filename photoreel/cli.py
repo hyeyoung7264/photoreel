@@ -25,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--aspect", default=DEFAULT_ASPECT, choices=list(ASPECTS))
     ap.add_argument("--seconds", type=float, default=None, help="목표 길이(초). 생략하면 15~30초 범위에서 정함")
     ap.add_argument("--style", default=None)
+    ap.add_argument("--engine", default="edit", help="edit(기본) 또는 parallax(깊이 추정으로 입체감)")
     ap.add_argument("--no-music", action="store_true")
     ap.add_argument("--out", type=Path, default=Path("out.mp4"))
     ap.add_argument("--plan-only", action="store_true")
@@ -46,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
         project.photos(), project.embeddings(), args.concept, title=args.title, aspect=args.aspect,
         target_duration=args.seconds, music=not args.no_music, style_id=args.style,
     )
+    board.engine = args.engine
     project.save_plan(board)
     names = {p["id"]: p["filename"] for p in project.photos()}
     print(f"\n스타일: {board.style} ({board.style_reason}) · 색감 {board.grade} · {board.total_duration:.1f}초")
@@ -71,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
 
     proxies = {p["id"]: project.proxy_path(p["id"]) for p in project.photos()}
     stats = render.render(board, {p["id"]: p for p in project.photos()}, proxies, rdir / "video.mp4", rdir, progress)
+    stats["status"] = "ok"
     stats["timings"]["analyze_sec"] = round(analyze_sec, 2)
     project.save_render(n, board, stats)
     shutil.copyfile(rdir / "video.mp4", args.out)
