@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>photoreel · 사진으로 영상 만들기</title>
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6860; --line: #e2dfd8;
+  --accent: #1f5f5b; --accent-ink: #ffffff; --warn-bg: #fff4d6; --warn-ink: #6b4a00;
+  --soft: #eef3f2; --danger: #a33a2c; --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161716; --panel: #1f2120; --ink: #ecebe7; --muted: #a09d95; --line: #343634;
+    --accent: #6fc3bb; --accent-ink: #0d1f1e; --warn-bg: #3a3118; --warn-ink: #f1d48a;
+    --soft: #262a29; --danger: #ef8d7e;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 20px 16px 80px; }
+header h1 { font-size: 22px; margin: 8px 0 2px; letter-spacing: -0.01em; }
+header p { margin: 0 0 18px; color: var(--muted); }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px; margin-bottom: 16px; }
+section.locked { opacity: .5; pointer-events: none; }
+h2 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: baseline; gap: 8px; }
+h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 small { font-weight: 400; color: var(--muted); font-size: 13px; }
+h3 { font-size: 14px; margin: 18px 0 8px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 10px 18px; }
+button:disabled { opacity: .5; cursor: default; }
+button.small { padding: 3px 8px; font-size: 13px; }
+select, input[type=text], textarea { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 9px; }
+textarea { width: 100%; min-height: 72px; resize: vertical; }
+label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.row > div { min-width: 120px; }
+.muted { color: var(--muted); font-size: 13px; }
+.drop { border: 2px dashed var(--line); border-radius: var(--radius); padding: 26px 16px; text-align: center; cursor: pointer; }
+.drop.over { border-color: var(--accent); background: var(--soft); }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 10px; margin-top: 14px; }
+.thumb { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+.thumb img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.thumb .cap { padding: 5px 7px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb .cap b { color: var(--ink); font-weight: 600; }
+.thumb button { position: absolute; top: 4px; right: 4px; padding: 0 7px; line-height: 22px; border-radius: 12px; background: rgba(0,0,0,.55); color: #fff; border: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.chip { border: 1px solid var(--line); border-radius: 16px; padding: 3px 11px; font-size: 13px; background: var(--bg); cursor: pointer; }
+.chip.static { cursor: default; background: var(--soft); }
+.box { border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 13.5px; }
+.box.info { background: var(--soft); }
+.box.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.box ul { margin: 4px 0 0; padding-left: 18px; }
+.scene { display: grid; grid-template-columns: 26px 84px 1fr auto; gap: 12px; align-items: center;
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: var(--bg); }
+.scene.dragging { opacity: .4; }
+.scene.chapter-start { margin-top: 16px; }
+.scene img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; display: block; }
+.scene .idx { font-weight: 700; color: var(--accent); text-align: center; cursor: grab; font-variant-numeric: tabular-nums; }
+.scene .why { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.scene .ctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.scene .ctl select { padding: 3px 6px; font-size: 13px; }
+.scene .side { display: flex; flex-direction: column; gap: 4px; }
+.stepper { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.excluded { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 13px; }
+.excluded img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; opacity: .6; }
+.bar { height: 10px; background: var(--soft); border-radius: 6px; overflow: hidden; margin: 10px 0 6px; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+video { max-width: 100%; max-height: 70vh; border-radius: 10px; background: #000; display: block; margin: 8px auto; }
+table.kv { border-collapse: collapse; font-size: 13.5px; margin: 8px 0; }
+table.kv td { padding: 3px 14px 3px 0; vertical-align: top; }
+table.kv td:first-child { color: var(--muted); white-space: nowrap; }
+.engines { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.engine { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font-size: 13px; }
+.engine.on { border-color: var(--accent); }
+.engine b { display: block; margin-bottom: 2px; font-size: 14px; }
+.tag { display: inline-block; font-size: 11.5px; padding: 0 7px; border-radius: 10px; background: var(--soft); margin-left: 6px; }
+#toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--danger); color: #fff;
+  padding: 10px 16px; border-radius: 10px; display: none; max-width: 90vw; z-index: 9; }
+@media (max-width: 640px) {
+  .scene { grid-template-columns: 22px 64px 1fr; }
+  .scene img { width: 64px; height: 64px; }
+  .scene .side { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>photoreel</h1>
+  <p>사진 여러 장과 원하는 콘셉트로 하나의 영상을 만듭니다. 검증용 프로토타입이며, 모든 처리는 이 컴퓨터 안에서 이뤄집니다.</p>
+</header>
+
+<section id="s-photos">
+  <h2><span class="num">1</span> 사진 올리기 <small id="photo-count"></small></h2>
+  <div class="drop" id="drop">
+    여기로 사진을 끌어다 놓거나 눌러서 고르세요<br>
+    <span class="muted">JPG · PNG · HEIC · WebP — 여행, 일상, 가족, 반려동물, 행사 등 어떤 사진이든</span>
+    <input type="file" id="file" multiple accept="image/*,.heic,.heif" hidden>
+  </div>
+  <div class="muted" id="upload-status" style="margin-top:8px"></div>
+  <div class="thumbs" id="thumbs"></div>
+</section>
+
+<section id="s-concept" class="locked">
+  <h2><span class="num">2</span> 콘셉트 <small>어떤 영상이면 좋을지 자유롭게 적어 주세요</small></h2>
+  <textarea id="concept" maxlength="500" placeholder="예: 잔잔하고 따뜻한 분위기로, 풍경 위주로 25초쯤"></textarea>
+  <div class="chips" id="examples"></div>
+  <div class="row">
+    <div style="flex:1; min-width:200px"><label for="title">첫 장면에 넣을 제목 (선택)</label><input type="text" id="title" maxlength="60" style="width:100%" placeholder="비워 두면 글자를 넣지 않습니다"></div>
+    <div><label for="aspect">화면 비율</label><select id="aspect"></select></div>
+    <div><label for="duration">길이</label><select id="duration"></select></div>
+    <div><label><input type="checkbox" id="music" checked> 음악 넣기</label></div>
+    <div><button class="primary" id="btn-plan">구성안 만들기</button></div>
+  </div>
+</section>
+
+<section id="s-plan" class="locked">
+  <h2><span class="num">3</span> 영상 구성안 <small id="plan-total"></small></h2>
+  <div class="row">
+    <div><label for="style">스타일</label><select id="style"></select></div>
+    <div><label for="grade">색감</label><select id="grade"></select></div>
+    <div><label for="mood">음악</label><select id="mood"></select></div>
+  </div>
+  <div class="muted" id="style-summary" style="margin-top:6px"></div>
+  <div id="plan-notes"></div>
+  <h3>생성 방식</h3>
+  <div class="engines" id="engines"></div>
+  <h3>장면 순서 <span class="muted" style="font-weight:400">— 번호를 끌거나 ▲▼로 순서를 바꿀 수 있습니다</span></h3>
+  <div id="scenes"></div>
+  <div id="excluded"></div>
+  <div class="row" style="margin-top:14px">
+    <button class="primary" id="btn-render">영상 만들기</button>
+    <button id="btn-replan">구성안 처음부터 다시</button>
+    <span class="muted" id="save-state"></span>
+  </div>
+</section>
+
+<section id="s-result" class="locked">
+  <h2><span class="num">4</span> 결과</h2>
+  <div id="progress" hidden>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="muted" id="stage"></div>
+  </div>
+  <div id="result"></div>
+  <div id="history"></div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { pid: null, meta: null, photos: [], plan: null, saveTimer: null, poll: null };
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.style.display = "none"), 5000);
+}
+async function api(method, path, body) {
+  const opt = { method, headers: {} };
+  if (body instanceof FormData) opt.body = body;
+  else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; }
+  const res = await fetch(path, opt);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { const j = await res.json(); detail = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail); } catch (e) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null) n.append(kid);
+  return n;
+};
+const thumbUrl = (id) => `/api/projects/${state.pid}/photos/${id}/thumb`;
+const photoOf = (id) => state.photos.find((p) => p.id === id) || { filename: "?" };
+const fmt = (s) => `${s.toFixed(1)}초`;
+
+// ---------- 시작 ----------
+async function init() {
+  state.meta = await api("GET", "/api/meta");
+  const m = state.meta;
+  for (const ex of m.concept_examples)
+    $("examples").append(el("span", { class: "chip", onclick: () => { $("concept").value = ex.text; } }, ex.label));
+  for (const [k, [w, h]] of Object.entries(m.aspects))
+    $("aspect").append(el("option", { value: k, selected: k === m.default_aspect }, `${k} (${w}×${h})`));
+  $("duration").append(el("option", { value: "" }, `알아서 (${m.auto_duration[0]}~${m.auto_duration[1]}초)`));
+  for (const s of [15, 20, 30, 45, 60]) $("duration").append(el("option", { value: s }, `약 ${s}초`));
+  for (const s of m.styles) $("style").append(el("option", { value: s.id }, s.name));
+  for (const [k, v] of Object.entries(m.grades)) $("grade").append(el("option", { value: k }, v));
+  $("mood").append(el("option", { value: "none" }, "음악 없음"));
+  for (const [k, v] of Object.entries(m.music_moods)) $("mood").append(el("option", { value: k }, `${v} 음악`));
+
+  const saved = location.hash.slice(1) || localStorage.getItem("photoreel.pid");
+  if (saved) {
+    try { await loadProject(saved); } catch (e) { state.pid = null; }
+  }
+  if (!state.pid) {
+    state.pid = (await api("POST", "/api/projects")).id;
+    remember();
+  }
+  renderAll();
+}
+function remember() { localStorage.setItem("photoreel.pid", state.pid); history.replaceState(null, "", "#" + state.pid); }
+async function loadProject(pid) {
+  const p = await api("GET", `/api/projects/${pid}`);
+  state.pid = p.id; state.photos = p.photos; state.plan = p.plan; state.renders = p.renders;
+  remember();
+  if (p.plan) { $("concept").value = p.plan.concept; $("title").value = p.plan.title; $("aspect").value = p.plan.output.aspect; }
+  if (p.job && p.job.state === "running") pollRender();
+}
+
+// ---------- 1. 사진 ----------
+$("drop").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => { upload([...e.target.files]); e.target.value = ""; });
+for (const ev of ["dragenter", "dragover"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+for (const ev of ["dragleave", "drop"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("over"); });
+$("drop").addEventListener("drop", (e) => upload([...e.dataTransfer.files]));
+
+async function upload(files) {
+  files = files.filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+  if (!files.length) return;
+  let done = 0; const failed = [];
+  for (const f of files) {
+    $("upload-status").textContent = `사진 분석 중… ${done + 1}/${files.length} (${f.name})`;
+    const fd = new FormData(); fd.append("files", f, f.name);
+    try {
+      const r = await api("POST", `/api/projects/${state.pid}/photos`, fd);
+      state.photos.push(...r.added);
+      for (const er of r.errors) failed.push(`${er.filename}: ${er.error}`);
+    } catch (e) { failed.push(`${f.name}: ${e.message}`); }
+    done++; renderPhotos();
+  }
+  $("upload-status").textContent = failed.length ? `올리지 못한 사진 ${failed.length}장 — ${failed.join(" / ")}` : `${done}장을 올렸습니다.`;
+  if (state.plan) $("upload-status").textContent += " 새 사진을 넣으려면 구성안을 다시 만들어 주세요.";
+  renderAll();
+}
+async function removePhoto(id) {
+  try { await api("DELETE", `/api/projects/${state.pid}/photos/${id}`); } catch (e) { return toast(e.message); }
+  state.photos = state.photos.filter((p) => p.id !== id);
+  if (state.plan) state.plan = (await api("GET", `/api/projects/${state.pid}`)).plan;
+  renderAll();
+}
+function renderPhotos() {
+  $("photo-count").textContent = state.photos.length ? `${state.photos.length}장` : "";
+  $("thumbs").replaceChildren(...state.photos.map((p) => el("div", { class: "thumb", title: p.filename },
+    el("img", { src: thumbUrl(p.id), alt: p.filename, loading: "lazy" }),
+    el("button", { title: "이 사진 빼기", onclick: () => removePhoto(p.id) }, "×"),
+    el("div", { class: "cap" }, el("b", {}, p.scene || "사진"), p.faces ? ` · 얼굴 ${p.faces}` : "", p.taken_at ? ` · ${p.taken_at.slice(5, 16).replace("T", " ")}` : ""))));
+}
+
+// ---------- 2. 구성안 만들기 ----------
+async function makePlan(extra = {}) {
+  const body = {
+    concept: $("concept").value, title: $("title").value, aspect: $("aspect").value,
+    target_duration: $("duration").value ? Number($("duration").value) : null, music: $("music").checked, ...extra,
+  };
+  $("btn-plan").disabled = true;
+  try { state.plan = await api("POST", `/api/projects/${state.pid}/plan`, body); }
+  catch (e) { toast(e.message); }
+  $("btn-plan").disabled = false;
+  renderAll();
+  if (!extra.keep_current_order) $("s-plan").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("btn-plan").addEventListener("click", () => makePlan());
+$("btn-replan").addEventListener("click", () => makePlan());
+
+// ---------- 3. 구성안 ----------
+function scheduleSave() {
+  $("save-state").textContent = "저장 중…";
+  clearTimeout(state.saveTimer);
+  state.saveTimer = setTimeout(savePlan, 350);
+}
+async function savePlan() {
+  clearTimeout(state.saveTimer); state.saveTimer = null;
+  try { state.plan = await api("PUT", `/api/projects/${state.pid}/plan`, state.plan); $("save-state").textContent = "저장됨"; }
+  catch (e) { toast(e.message); $("save-state").textContent = "저장 실패"; }
+  renderPlan();
+}
+$("style").addEventListener("change", () => makePlan({ style: $("style").value, keep_current_order: true }));
+$("grade").addEventListener("change", () => { state.plan.grade = $("grade").value; scheduleSave(); });
+$("mood").addEventListener("change", () => {
+  const v = $("mood").value;
+  if (v === "none") state.plan.music.mode = "none"; else { state.plan.music.mode = "synth"; state.plan.music.mood = v; }
+  scheduleSave();
+});
+function reorder(inc) {
+  // 맨 앞에 있던 장면은 전환 값이 '바로 전환'으로 되어 있다. 뒤로 옮겨지면 스타일의 기본 전환을 준다.
+  const wasFirst = state.plan.scenes.find((s) => s.included);
+  const st = state.meta.styles.find((s) => s.id === state.plan.style);
+  if (wasFirst && inc[0] !== wasFirst && wasFirst.transition === "cut") wasFirst.transition = st.transition;
+  state.plan.scenes = [...inc, ...state.plan.scenes.filter((s) => !s.included)];
+  renderPlan(); scheduleSave();
+}
+function move(i, d) {
+  const inc = state.plan.scenes.filter((s) => s.included), j = i + d;
+  if (j < 0 || j >= inc.length) return;
+  [inc[i], inc[j]] = [inc[j], inc[i]];
+  reorder(inc);
+}
+function moveTo(from, to) {
+  const inc = state.plan.scenes.filter((s) => s.included);
+  const [s] = inc.splice(from, 1); inc.splice(to, 0, s);
+  reorder(inc);
+}
+function setIncluded(id, on) {
+  const s = state.plan.scenes.find((x) => x.photo_id === id);
+  const inc = state.plan.scenes.filter((x) => x.included && x !== s);
+  const exc = state.plan.scenes.filter((x) => !x.included && x !== s);
+  s.included = on;
+  if (on) s.transition = state.meta.styles.find((x) => x.id === state.plan.style).transition;
+  else s.exclude_reason = "직접 제외함";
+  state.plan.scenes = on ? [...inc, s, ...exc] : [...inc, ...exc, s];
+  renderPlan(); scheduleSave();
+}
+const options = (map, cur) => Object.entries(map).map(([k, v]) => el("option", { value: k, selected: k === cur }, v));
+
+function renderPlan() {
+  const plan = state.plan, m = state.meta;
+  if (!plan) return;
+  const beat = 60 / plan.music.bpm;
+  const inc = plan.scenes.filter((s) => s.included), exc = plan.scenes.filter((s) => !s.included);
+  const total = inc.reduce((a, s) => a + s.beats * beat, 0);
+  $("plan-total").textContent = `${inc.length}장면 · ${fmt(total)} · ${plan.output.aspect}`;
+  $("style").value = plan.style; $("grade").value = plan.grade;
+  $("mood").value = plan.music.mode === "none" ? "none" : plan.music.mood;
+  const st = m.styles.find((s) => s.id === plan.style);
+  $("style-summary").textContent = `${st.description} (${plan.style_reason}) — ${st.summary}`;
+
+  const notes = [];
+  if (plan.signals.length) notes.push(el("div", { class: "box info" }, el("b", {}, "콘셉트에서 읽은 것"),
+    el("div", { class: "chips", style: "margin:6px 0 0" }, plan.signals.map((s) => el("span", { class: "chip static" }, `“${s.found}” → ${s.meaning}`)))));
+  else notes.push(el("div", { class: "box info" }, "콘셉트 문장에서 읽어 낸 단서가 없어 기본 설정으로 만들었습니다. 아래에서 직접 고칠 수 있습니다."));
+  if (plan.unsupported.length) notes.push(el("div", { class: "box warn" }, el("b", {}, "반영하지 못한 요청"), el("ul", {}, plan.unsupported.map((u) => el("li", {}, u)))));
+  notes.push(el("div", { class: "box info" }, el("b", {}, "순서를 정한 기준"), el("div", {}, plan.order_basis), plan.notes.length ? el("ul", {}, plan.notes.map((n) => el("li", {}, n))) : null));
+  $("plan-notes").replaceChildren(...notes);
+
+  $("engines").replaceChildren(...m.engines.map((e) => el("div", { class: "engine" + (e.id === plan.engine ? " on" : "") },
+    el("b", {}, e.name, el("span", { class: "tag" }, e.id === plan.engine ? "이번에 사용" : e.available ? "사용 가능" : "아직 연결 안 됨")),
+    e.disclosure, e.available ? null : el("div", { class: "muted", style: "margin-top:4px" }, e.requirement))));
+
+  let dragFrom = null;
+  $("scenes").replaceChildren(...inc.map((s, i) => {
+    const p = photoOf(s.photo_id);
+    const card = el("div", { class: "scene" + (i > 0 && s.chapter !== inc[i - 1].chapter ? " chapter-start" : ""), draggable: true },
+      el("div", { class: "idx", title: "끌어서 순서 바꾸기" }, String(i + 1)),
+      el("img", { src: thumbUrl(s.photo_id), alt: p.filename, draggable: false }),
+      el("div", {},
+        el("div", { class: "why" }, el("b", { style: "color:var(--ink)" }, p.filename), s.reason ? ` — ${s.reason}` : ""),
+        el("div", { class: "ctl" },
+          el("span", { class: "stepper" },
+            el("button", { class: "small", onclick: () => { if (s.beats > 1) { s.beats--; renderPlan(); scheduleSave(); } } }, "−"),
+            fmt(s.beats * beat),
+            el("button", { class: "small", onclick: () => { if (s.beats < 16) { s.beats++; renderPlan(); scheduleSave(); } } }, "+")),
+          el("select", { title: "움직임", onchange: (e) => { s.motion = e.target.value; scheduleSave(); } }, options(m.motions, s.motion)),
+          el("select", { title: s.framing_reason || "화면 맞춤", onchange: (e) => { s.framing = e.target.value; scheduleSave(); } }, options(m.framings, s.framing)),
+          i > 0 ? el("select", { title: "앞 장면에서 넘어오는 전환", onchange: (e) => { s.transition = e.target.value; scheduleSave(); } }, options(m.transitions, s.transition)) : null)),
+      el("div", { class: "side" },
+        el("button", { class: "small", disabled: i === 0, onclick: () => move(i, -1), title: "앞으로" }, "▲"),
+        el("button", { class: "small", disabled: i === inc.length - 1, onclick: () => move(i, 1), title: "뒤로" }, "▼"),
+        el("button", { class: "small", onclick: () => setIncluded(s.photo_id, false) }, "빼기")));
+    card.addEventListener("dragstart", (e) => { dragFrom = i; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    card.addEventListener("dragover", (e) => e.preventDefault());
+    card.addEventListener("drop", (e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== i) moveTo(dragFrom, i); dragFrom = null; });
+    return card;
+  }));
+  $("excluded").replaceChildren(...(exc.length ? [el("h3", {}, `뺀 사진 ${exc.length}장`)] : []), ...exc.map((s) => el("div", { class: "excluded" },
+    el("img", { src: thumbUrl(s.photo_id), alt: "" }),
+    el("div", { style: "flex:1" }, el("b", {}, photoOf(s.photo_id).filename), el("div", { class: "muted" }, s.exclude_reason)),
+    el("button", { class: "small", onclick: () => setIncluded(s.photo_id, true) }, "다시 넣기"))));
+  $("btn-render").disabled = inc.length === 0;
+}
+
+// ---------- 4. 만들기 ----------
+$("btn-render").addEventListener("click", async () => {
+  if (state.saveTimer) await savePlan();
+  try { await api("POST", `/api/projects/${state.pid}/render`); } catch (e) { return toast(e.message); }
+  $("s-result").classList.remove("locked");
+  $("s-result").scrollIntoView({ behavior: "smooth", block: "start" });
+  pollRender();
+});
+function pollRender() {
+  clearInterval(state.poll);
+  $("progress").hidden = false; $("btn-render").disabled = true;
+  const tick = async () => {
+    let job; try { job = await api("GET", `/api/projects/${state.pid}/render`); } catch (e) { return; }
+    $("bar").style.width = `${Math.round((job.progress || 0) * 100)}%`;
+    $("stage").textContent = job.state === "running" ? `${job.stage} · ${Math.round((job.progress || 0) * 100)}% · ${job.elapsed_sec ?? 0}초 지남` : "";
+    if (job.state === "running") return;
+    clearInterval(state.poll); $("progress").hidden = true; $("btn-render").disabled = false;
+    state.renders = (await api("GET", `/api/projects/${state.pid}`)).renders;
+    if (job.state === "error") toast(`만들지 못했습니다 (${job.stage}): ${job.error}`);
+    renderResult();
+  };
+  state.poll = setInterval(tick, 700); tick();
+}
+function renderResult() {
+  const all = state.renders || [], ok = all.filter((r) => r.status === "ok");
+  $("s-result").classList.toggle("locked", !all.length && $("progress").hidden);
+  const last = all[all.length - 1];
+  const out = [];
+  if (last && last.status === "failed")
+    out.push(el("div", { class: "box warn" }, `${last.render}번째 시도 실패 — 단계: ${last.failed_stage}. ${last.error}`));
+  const r = ok[ok.length - 1];
+  if (r) {
+    const base = `/api/projects/${state.pid}/renders/${r.render}/video`;
+    out.push(
+      el("video", { src: base, controls: true, playsinline: true, preload: "metadata" }),
+      el("div", { class: "row", style: "justify-content:center" }, el("a", { href: base + "?download=1" }, el("button", { class: "primary" }, "MP4 내려받기"))),
+      el("div", { class: "box info" }, el("b", {}, "이 영상이 만들어진 방식"), el("div", {}, r.engine.disclosure),
+        el("div", {}, r.audio ? `음악: ${r.audio.source}, ${r.audio.bpm}BPM` : "음악: 없음 (무음)")),
+      el("table", { class: "kv" },
+        el("tr", {}, el("td", {}, "영상"), el("td", {}, `${r.width}×${r.height} · ${r.fps}fps · ${fmt(r.duration)} · ${r.scenes}장면 · ${(r.bytes / 1e6).toFixed(1)}MB`)),
+        el("tr", {}, el("td", {}, "만드는 데 걸린 시간"), el("td", {}, `${r.timings.total_sec}초 (측정값)`)),
+        el("tr", {}, el("td", {}, "비용"), el("td", {}, `${r.cost_usd === 0 ? "0원" : "$" + r.cost_usd} — ${r.cost_note}`))));
+  }
+  $("result").replaceChildren(...out);
+  $("history").replaceChildren(...(all.length > 1 ? [el("h3", {}, "만든 기록"), el("table", { class: "kv" }, all.slice().reverse().map((x) => el("tr", {},
+    el("td", {}, `#${x.render} · ${x.created_at.replace("T", " ")}`),
+    el("td", {}, x.status === "ok"
+      ? el("span", {}, `${fmt(x.duration)} · ${x.scenes}장면 · ${x.timings.total_sec}초 걸림 · `, el("a", { href: `/api/projects/${state.pid}/renders/${x.render}/video`, target: "_blank" }, "보기"))
+      : `실패 (${x.failed_stage})`))))] : []));
+}
+
+function renderAll() {
+  renderPhotos();
+  $("s-concept").classList.toggle("locked", state.photos.length === 0);
+  $("s-plan").classList.toggle("locked", !state.plan);
+  renderPlan(); renderResult();
+}
+init().catch((e) => toast("시작하지 못했습니다: " + e.message));
+</script>
+</body>
+</html>

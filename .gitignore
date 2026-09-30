@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+out/
+assets_cache/
+samples/*/*.jpg
+samples/*/*.jpeg
+samples/*/*.png
+.pytest_cache/
+*.log
