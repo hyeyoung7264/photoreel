@@ -72,4 +72,4 @@ PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu22.04-x64 uv run playwright install chro
 PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu22.04-x64 uv run python scripts/e2e_browser.py samples/jeju out/e2e
 ```
 
-결과 점검과 평가 기록은 [docs/EVALUATION.md](docs/EVALUATION.md)에 있습니다.
+결과 점검과 평가 기록은 [docs/EVALUATION.md](docs/EVALUATION.md)에, 작업 지시 원문과 진행 중 내린 판단은 [docs/BRIEF.md](docs/BRIEF.md)에 있습니다.
